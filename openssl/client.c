@@ -10,7 +10,7 @@
 #include <openssl/err.h>
 #define FAIL    -1
 
-int OpenConnection(const char *hostname, int port){
+int Open_Connection(const char *hostname, int port){
     int sd;
     struct hostent *host;
     struct sockaddr_in addr;
@@ -30,7 +30,8 @@ int OpenConnection(const char *hostname, int port){
     }
     return sd;
 }
-SSL_CTX* InitCTX(void){
+
+SSL_CTX* Init_CTX(void){
     SSL_METHOD *method;
     SSL_CTX *ctx;
     OpenSSL_add_all_algorithms();  /* Load cryptos, et.al. */
@@ -44,30 +45,58 @@ SSL_CTX* InitCTX(void){
     return ctx;
 }
 
-void ShowCerts(SSL* ssl){
+void Show_Certs(SSL* ssl){
     X509 *cert;
     char *line;
-    cert = SSL_get_peer_certificate(ssl); /* get the server's certificate */
+    cert = SSL_get_peer_certificate(ssl);
     if ( cert != NULL ){
         printf("Server certificates:\n");
         line = X509_NAME_oneline(X509_get_subject_name(cert), 0, 0);
         printf("Subject: %s\n", line);
-        free(line);       /* free the malloc'ed string */
+        free(line);
         line = X509_NAME_oneline(X509_get_issuer_name(cert), 0, 0);
         printf("Issuer: %s\n", line);
-        free(line);       /* free the malloc'ed string */
-        X509_free(cert);     /* free the malloc'ed certificate copy */
+        free(line);
+        X509_free(cert);
     } else {
         printf("Info: No client certificates configured.\n");
     }
 }
+void Connect_Client(SSL *ssl)
+{
+    char buf[1024] = {0};
+    int sd, bytes, bytes_w;
+    if ( SSL_accept(ssl) == FAIL ){
+        ERR_print_errors_fp(stderr);
+    } else {
+        Show_Certs(ssl);
+        scanf("%s", buf);
+        bytes_w = SSL_write(ssl, buf, sizeof(buf));
+        if (bytes_w > 0){
+            buf[0] = '\0';
+        }
+        while(1){
+            bytes = SSL_read(ssl, buf, sizeof(buf));
+            if (bytes > 0){
+                printf("<< %s\n", buf);
+                buf[0] = '\0';
+            }
+            scanf("%s", buf);
+            bytes_w = SSL_write(ssl, buf, sizeof(buf));
+            if (bytes_w > 0){
+                buf[0] = '\0';
+            }
+        }
+    }
+    sd = SSL_get_fd(ssl);
+    SSL_free(ssl);
+    close(sd);
+}
+
 int main(int count, char *strings[]){
     SSL_CTX *ctx;
     int server;
     SSL *ssl;
-    char buf[1024];
-    char acClientRequest[1024] ={0};
-    int bytes;
     char *hostname, *portnum;
     if ( count != 3 ){
         printf("usage: %s <hostname> <portnum>\n", strings[0]);
@@ -76,34 +105,19 @@ int main(int count, char *strings[]){
     SSL_library_init();
     hostname=strings[1];
     portnum=strings[2];
-    ctx = InitCTX();
-    server = OpenConnection(hostname, atoi(portnum));
-    ssl = SSL_new(ctx);      /* create new SSL connection state */
-    SSL_set_fd(ssl, server);    /* attach the socket descriptor */
-   /* perform the connection */
+    ctx = Init_CTX();
+    server = Open_Connection(hostname, atoi(portnum));
+    ssl = SSL_new(ctx);
+    SSL_set_fd(ssl, server);
     if ( SSL_connect(ssl) == FAIL ){
         ERR_print_errors_fp(stderr);
     }else{
-        char acUsername[16] ={0};
-        char acPassword[16] ={0};
-        const char *cpRequestMessage = "<Body>\
-        <UserName>%s<UserName>\
-        <Password>%s<Password>\
-        <\Body>";
-        printf("Enter the User Name : ");
-        scanf("%s",acUsername);
-        printf("\n\nEnter the Password : ");
-        scanf("%s",acPassword);
-        sprintf(acClientRequest, cpRequestMessage, acUsername,acPassword);   /* construct reply */
-        printf("\n\nConnected with %s encryption\n", SSL_get_cipher(ssl));
-        ShowCerts(ssl);        /* get any certs */
-        SSL_write(ssl,acClientRequest, strlen(acClientRequest));   /* encrypt & send message */
-        bytes = SSL_read(ssl, buf, sizeof(buf)); /* get reply & decrypt */
-        buf[bytes] = 0;
-        printf("Received: \"%s\"\n", buf);
-        SSL_free(ssl);        /* release connection state */
+        printf("\nConnected with %s encryption\n", SSL_get_cipher(ssl));
+        Show_Certs(ssl);
+        Connect_Client(ssl);
+        SSL_free(ssl);
     }
-    close(server);         /* close socket */
-    SSL_CTX_free(ctx);        /* release context */
+    close(server);
+    SSL_CTX_free(ctx);
     return 0;
 }
