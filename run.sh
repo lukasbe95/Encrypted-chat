@@ -10,7 +10,7 @@ if [ "$encrypt" = "b" ] ; then
     xterm ./client &
     echo "Botan"
 elif [ "$encrypt" = "o" ] ; then
-    cd ./opensll/
+    cd ./openssl/
     xterm -e ./server.o $port&
     xterm -e ./client.o "localhost" $port&
     echo "OpenSLL"

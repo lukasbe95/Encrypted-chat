@@ -128,10 +128,10 @@ int main(int count, char *Argc[])
     int server;
     char *portnum;
     //Only root user have the permsion to run the server
-    if(!is_Root()){
-        printf("This program must be run as root/sudo user!!");
-        exit(0);
-    }
+    // if(!is_Root()){
+    //     printf("This program must be run as root/sudo user!!");
+    //     exit(0);
+    // }
     if ( count != 2 ){
         printf("Usage: %s <portnum>\n", Argc[0]);
         exit(0);
